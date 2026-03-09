@@ -1,0 +1,228 @@
+---
+title: Events
+description: All events emitted by the Pacta protocol
+---
+
+Pacta emits events for every state change. Use these to build dashboards, notification systems, and activity feeds in your app.
+
+Query events using the Sui RPC `queryEvents` method with the event type `PACKAGE_ID::pacta::EVENT_NAME`.
+
+---
+
+## AgreementCreated
+
+Emitted when a new agreement is created.
+
+```typescript
+{
+  agreement_id:       string   // Sui object ID of the new agreement
+  version:            number   // Protocol version
+  creator:            string   // Address that created the agreement
+  party_a:            string   // Party A address
+  party_b:            string   // Party B address
+  arbiter:            string   // Arbiter address
+  release_conditions: number   // Condition bitmask
+  expiry_ms:          number   // Expiry timestamp (0 = none)
+  unlock_time_ms:     number   // Unlock timestamp (0 = none)
+}
+```
+
+---
+
+## PartyBSet
+
+Emitted when party B's address is updated.
+
+```typescript
+{
+  agreement_id: string  // Agreement object ID
+  new_party_b:  string  // New party B address
+  set_by:       string  // Address that made the change (must be creator)
+}
+```
+
+---
+
+## CoinDeposited
+
+Emitted when a coin is deposited into an agreement.
+
+```typescript
+{
+  agreement_id: string  // Agreement object ID
+  depositor:    string  // Address that deposited
+  party:        number  // 0 = party A, 1 = party B
+  amount:       number  // Amount in base units (MIST for SUI)
+}
+```
+
+---
+
+## ObjectDeposited
+
+Emitted when a Move object is deposited into an agreement.
+
+```typescript
+{
+  agreement_id: string  // Agreement object ID
+  depositor:    string  // Address that deposited
+  party:        number  // 0 = party A, 1 = party B
+  object_id:    string  // ID of the deposited object
+  index:        number  // Index within that party's object slots
+}
+```
+
+---
+
+## PartyApproved
+
+Emitted when a party calls `approve()`.
+
+```typescript
+{
+  agreement_id: string  // Agreement object ID
+  party:        number  // 0 = party A, 1 = party B
+  approved_by:  string  // Address that approved
+}
+```
+
+---
+
+## AgreementSettled
+
+Emitted when an agreement is settled and funds are released.
+
+```typescript
+{
+  agreement_id:  string  // Agreement object ID
+  executor:      string  // Address that triggered settlement
+  a_recipient:   string  // Where party A's funds went
+  b_recipient:   string  // Where party B's funds went
+  settled_at_ms: number  // Settlement timestamp in Unix ms
+}
+```
+
+---
+
+## AgreementCancelled
+
+Emitted when an agreement is cancelled.
+
+```typescript
+{
+  agreement_id: string  // Agreement object ID
+  cancelled_by: string  // Address that triggered cancellation
+}
+```
+
+---
+
+## MutualCancelConsent
+
+Emitted when a party signals consent to mutual cancel.
+
+```typescript
+{
+  agreement_id: string  // Agreement object ID
+  party:        number  // 0 = party A, 1 = party B
+  by:           string  // Address that consented
+}
+```
+
+---
+
+## CoinClaimed
+
+Emitted when a party claims a coin after settlement.
+
+```typescript
+{
+  agreement_id: string  // Agreement object ID
+  claimed_by:   string  // Address that claimed
+  source_party: number  // Which party's slot the coin came from (0 or 1)
+  amount:       number  // Amount claimed in base units
+}
+```
+
+---
+
+## ObjectClaimed
+
+Emitted when a party claims an object after settlement.
+
+```typescript
+{
+  agreement_id: string  // Agreement object ID
+  claimed_by:   string  // Address that claimed
+  source_party: number  // Which party's slot the object came from
+  object_id:    string  // ID of the claimed object
+}
+```
+
+---
+
+## DisputeRaised
+
+Emitted when a party raises a dispute.
+
+```typescript
+{
+  agreement_id: string    // Agreement object ID
+  raised_by:    string    // Address that raised the dispute
+  reason:       number[]  // UTF-8 encoded reason bytes
+}
+```
+
+---
+
+## DisputeResolved
+
+Emitted when the arbiter resolves a dispute.
+
+```typescript
+{
+  agreement_id: string  // Agreement object ID
+  arbiter:      string  // Arbiter address
+  resolution:   number  // 0=favour A | 1=favour B | 2=coin split | 3=obj assigned | 4=concluded
+}
+```
+
+---
+
+## HookAttached
+
+Emitted when a protocol hook is attached to an agreement.
+
+```typescript
+{
+  agreement_id: string  // Agreement object ID
+  attached_by:  string  // Address that attached the hook
+}
+```
+
+---
+
+## Querying Events in Your App
+
+```typescript
+import { SuiClient } from "@mysten/sui/client"
+
+const suiClient = new SuiClient({ url: "https://fullnode.testnet.sui.io:443" })
+
+// Get all settled agreements
+const events = await suiClient.queryEvents({
+  query: {
+    MoveEventType: `${PACKAGE_ID}::pacta::AgreementSettled`,
+  },
+  limit: 50,
+})
+
+for (const event of events.data) {
+  const fields = event.parsedJson as {
+    agreement_id:  string
+    executor:      string
+    settled_at_ms: string
+  }
+  console.log(`Settled: ${fields.agreement_id} at ${fields.settled_at_ms}`)
+}
+```

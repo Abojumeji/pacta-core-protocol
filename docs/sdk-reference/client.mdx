@@ -1,0 +1,258 @@
+---
+title: PactaClient
+description: The main class for interacting with the Pacta protocol
+---
+
+## Installation
+
+```bash
+npm install @pacta/sdk
+```
+
+## Initialisation
+
+```typescript
+import { PactaClient } from "@pacta/sdk"
+
+const pacta = new PactaClient({ network: "testnet" })
+```
+
+### Options
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `network` | `"localnet" \| "testnet" \| "mainnet"` | Yes | Which network to connect to |
+| `overrides` | `Partial<NetworkConfig>` | No | Override packageId, registryId, or rpcUrl |
+
+### Custom Package ID
+
+After you deploy your own instance, pass the package ID as an override:
+
+```typescript
+const pacta = new PactaClient({
+  network:   "testnet",
+  overrides: {
+    packageId:  "0xYOUR_PACKAGE_ID...",
+    registryId: "0xYOUR_REGISTRY_ID...",
+  },
+})
+```
+
+---
+
+## Read Methods
+
+### `getAgreement(agreementId)`
+
+Fetch a single agreement by its object ID.
+
+```typescript
+const agreement = await pacta.getAgreement("0xAGREEMENT_ID...")
+```
+
+**Returns:** [`Agreement`](/sdk-reference/types#agreement)
+
+---
+
+### `getRegistry()`
+
+Fetch the PactaRegistry shared object — global protocol statistics.
+
+```typescript
+const registry = await pacta.getRegistry()
+console.log(registry.totalAgreements)
+console.log(registry.totalSettled)
+```
+
+**Returns:** [`PactaRegistry`](/sdk-reference/types#pactaregistry)
+
+---
+
+### `getAgreementsByCreator(creator)`
+
+Fetch all agreement IDs created by a given address, using on-chain events.
+
+```typescript
+const ids = await pacta.getAgreementsByCreator("0xCREATOR_ADDRESS...")
+```
+
+**Returns:** `string[]`
+
+---
+
+## Write Methods
+
+All write methods take a `signer` as the first argument. The signer is any object that has an `address` and a `signAndExecuteTransaction` method. This makes the SDK wallet-agnostic — use it with Sui dApp Kit, a Keypair, or a multisig signer.
+
+---
+
+### `createAgreement(signer, params)`
+
+Create a new agreement and share it on-chain.
+
+```typescript
+await pacta.createAgreement(signer, {
+  partyA:            signer.address,
+  partyB:            "0xBOB...",
+  arbiter:           "0xARBITER...",
+  releaseConditions: ConditionPreset.FullConsent,
+  termsHash:         "0xHASH...",
+  expiryMs:          0n,
+  unlockTimeMs:      0n,
+  metadata:          "0x",  // optional
+})
+```
+
+| Param | Type | Description |
+|---|---|---|
+| `partyA` | `string` | Address of party A (usually the caller) |
+| `partyB` | `string` | Address of party B |
+| `arbiter` | `string` | Arbiter address, or `"0x0"` for none |
+| `releaseConditions` | `number` | Condition bitmask — see [Release Conditions](/core-concepts/release-conditions) |
+| `termsHash` | `string` | Hex-encoded SHA3-256 hash of the off-chain agreement document |
+| `expiryMs` | `bigint` | Unix ms after which agreement expires. `0n` = no expiry |
+| `unlockTimeMs` | `bigint` | Unix ms before which settlement is blocked. `0n` = no timelock |
+| `metadata` | `string` | Optional app-specific data as hex string |
+
+---
+
+### `setPartyB(signer, params)`
+
+Update party B's address before they have deposited. Creator only.
+
+```typescript
+await pacta.setPartyB(signer, {
+  agreementId: "0xAGREEMENT_ID...",
+  newPartyB:   "0xNEW_PARTY_B...",
+})
+```
+
+---
+
+### `depositCoin(signer, params)`
+
+Deposit a coin into the agreement. Works for both party A and party B — the contract resolves the party from the sender address.
+
+```typescript
+await pacta.depositCoin(signer, {
+  agreementId:  "0xAGREEMENT_ID...",
+  coinObjectId: "0xCOIN_OBJECT_ID...",
+  coinType:     "0x2::sui::SUI",
+})
+```
+
+| Param | Type | Description |
+|---|---|---|
+| `agreementId` | `string` | The agreement object ID |
+| `coinObjectId` | `string` | The specific coin object to deposit |
+| `coinType` | `string` | Full Move type — e.g. `"0x2::sui::SUI"` or `"0xUSDC_PACKAGE::usdc::USDC"` |
+
+---
+
+### `approve(signer, params)`
+
+Record the caller's approval to release funds.
+
+```typescript
+await pacta.approve(signer, { agreementId: "0xAGREEMENT_ID..." })
+```
+
+---
+
+### `settle(signer, params)`
+
+Trigger settlement. Any address can call this once all conditions are met.
+
+```typescript
+await pacta.settle(anyWallet, { agreementId: "0xAGREEMENT_ID..." })
+```
+
+---
+
+### `cancel(signer, params)`
+
+Cancel the agreement.
+- In `Created` state: only the creator can cancel
+- In `Active` state: either party can cancel if only one has deposited
+
+```typescript
+await pacta.cancel(signer, { agreementId: "0xAGREEMENT_ID..." })
+```
+
+---
+
+### `mutualCancel(signer, params)`
+
+Signal consent to a mutual cancel. Both parties must call this. When both have consented, the agreement cancels automatically.
+
+```typescript
+await pacta.mutualCancel(signer, { agreementId: "0xAGREEMENT_ID..." })
+```
+
+---
+
+### `cancelExpired(signer, agreementId)`
+
+Cancel an expired agreement. Anyone can call this after the `expiryMs` timestamp has passed.
+
+```typescript
+await pacta.cancelExpired(signer, "0xAGREEMENT_ID...")
+```
+
+---
+
+### `raiseDispute(signer, params)`
+
+Raise a dispute on an active agreement. Either party can call this.
+
+```typescript
+await pacta.raiseDispute(signer, {
+  agreementId: "0xAGREEMENT_ID...",
+  reason:      "Deliverable was not submitted by the agreed deadline",
+})
+```
+
+---
+
+### `resolveDispute(signer, params)`
+
+Resolve a dispute. Only the arbiter can call this.
+
+```typescript
+await pacta.resolveDispute(arbiterSigner, {
+  agreementId: "0xAGREEMENT_ID...",
+  resolution:  0, // 0 = favour party A, 1 = favour party B
+})
+```
+
+---
+
+### `claimCoin(signer, params)`
+
+Claim your allocated coin after settlement or dispute resolution.
+
+```typescript
+await pacta.claimCoin(signer, {
+  agreementId: "0xAGREEMENT_ID...",
+  coinType:    "0x2::sui::SUI",
+})
+```
+
+---
+
+## PTB Builder Methods
+
+For advanced use — returns a raw `Transaction` object instead of signing immediately. Use this when you need to compose multiple operations in a single PTB before signing.
+
+```typescript
+const tx = pacta.buildSettle({ agreementId: "0xAGREEMENT_ID..." })
+
+// Add more operations to tx...
+
+await signer.signAndExecuteTransaction(tx)
+```
+
+Available builders mirror all write methods:
+`buildCreateAgreement`, `buildSetPartyB`, `buildDepositCoin`, `buildApprove`,
+`buildSettle`, `buildCancel`, `buildMutualCancel`, `buildCancelExpired`,
+`buildRaiseDispute`, `buildResolveDispute`, `buildClaimCoin`

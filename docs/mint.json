@@ -1,0 +1,70 @@
+{
+  "name": "Pacta Protocol",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark":  "/logo/dark.svg"
+  },
+  "favicon": "/logo/favicon.svg",
+  "colors": {
+    "primary":    "#1E3A8A",
+    "light":      "#3B82F6",
+    "dark":       "#1E3A8A",
+    "background": {
+      "light": "#FFFFFF",
+      "dark":  "#0F172A"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url":  "https://github.com/Abojumeji/pacta-core-protocol"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Build on Pacta",
+    "url":  "https://pacta.mintlify.app/getting-started"
+  },
+  "navigation": [
+    {
+      "group": "Overview",
+      "pages": [
+        "introduction",
+        "getting-started"
+      ]
+    },
+    {
+      "group": "Core Concepts",
+      "pages": [
+        "core-concepts/agreement-lifecycle",
+        "core-concepts/release-conditions",
+        "core-concepts/parties-and-arbiter"
+      ]
+    },
+    {
+      "group": "SDK Reference",
+      "pages": [
+        "sdk-reference/client",
+        "sdk-reference/types"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/freelance-app",
+        "guides/otc-desk"
+      ]
+    },
+    {
+      "group": "Protocol Reference",
+      "pages": [
+        "protocol-reference/functions",
+        "protocol-reference/events",
+        "protocol-reference/error-codes"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "twitter": "https://x.com/PactaLab",
+    "github":  "https://github.com/Abojumeji/pacta-core-protocol"
+  }
+}

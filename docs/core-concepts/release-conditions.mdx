@@ -1,0 +1,99 @@
+---
+title: Release Conditions
+description: How to control exactly when funds are released
+---
+
+## What Are Release Conditions?
+
+Release conditions are the rules that must all be satisfied before an agreement can be settled. You set them when you create the agreement and they cannot be changed afterward.
+
+They work like a checklist. Every item on the checklist must be ticked before funds move. One un-ticked item blocks settlement entirely.
+
+## The Conditions
+
+| Condition | Value | What it requires |
+|---|---|---|
+| `ADeposited` | `0x01` | Party A has deposited their funds |
+| `BDeposited` | `0x02` | Party B has deposited their funds |
+| `AApproved` | `0x04` | Party A has called `approve()` |
+| `BApproved` | `0x08` | Party B has called `approve()` |
+| `Timelock` | `0x10` | The `unlockTimeMs` timestamp has passed |
+
+## Combining Conditions
+
+You combine conditions using bitwise OR. The SDK provides presets for the most common combinations:
+
+```typescript
+import { Condition, ConditionPreset } from "@pacta/sdk"
+
+// Preset: both deposit + both approve (standard two-party escrow)
+ConditionPreset.FullConsent    // = 0x01 | 0x02 | 0x04 | 0x08 = 15
+
+// Preset: both deposit only — no approval step
+ConditionPreset.DepositOnly    // = 0x01 | 0x02 = 3
+
+// Preset: both deposit + timelock expires
+ConditionPreset.TimelockEscrow // = 0x01 | 0x02 | 0x10 = 19
+
+// Custom: party A deposits + party B approves only
+const custom = Condition.ADeposited | Condition.BApproved  // = 0x09
+```
+
+## Choosing the Right Preset
+
+### FullConsent — Standard Escrow
+
+Both parties deposit. Both parties must actively approve before funds release. Best for:
+- Freelance agreements (client approves after work is delivered)
+- Service agreements where both sides need to confirm
+
+```typescript
+releaseConditions: ConditionPreset.FullConsent
+```
+
+### DepositOnly — Automatic Release
+
+Both parties deposit. Settlement triggers automatically with no approval step. Best for:
+- Simple token swaps (both parties commit funds, swap happens automatically)
+- Situations where deposit itself signals agreement
+
+```typescript
+releaseConditions: ConditionPreset.DepositOnly
+```
+
+### TimelockEscrow — Time-Gated Release
+
+Both parties deposit. Funds cannot move until a specified timestamp passes. Best for:
+- Vesting schedules
+- Delayed payment agreements
+- Any deal where time is the condition
+
+```typescript
+releaseConditions: ConditionPreset.TimelockEscrow,
+unlockTimeMs: BigInt(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+```
+
+## Important Rule
+
+You must include at least one condition. An agreement with `releaseConditions = 0` cannot be settled — the contract will reject the settlement call.
+
+## Checking Conditions On-Chain
+
+```typescript
+const agreement = await pacta.getAgreement("0xAGREEMENT_ID...")
+const { Condition } = await import("@pacta/sdk")
+
+const needsADeposit  = (agreement.releaseConditions & Condition.ADeposited) !== 0
+const needsBDeposit  = (agreement.releaseConditions & Condition.BDeposited) !== 0
+const needsAApproval = (agreement.releaseConditions & Condition.AApproved)  !== 0
+const needsBApproval = (agreement.releaseConditions & Condition.BApproved)  !== 0
+const needsTimelock  = (agreement.releaseConditions & Condition.Timelock)   !== 0
+
+const isReady =
+  (!needsADeposit  || agreement.aDeposited) &&
+  (!needsBDeposit  || agreement.bDeposited) &&
+  (!needsAApproval || agreement.aApproved)  &&
+  (!needsBApproval || agreement.bApproved)
+
+console.log("Ready to settle:", isReady)
+```

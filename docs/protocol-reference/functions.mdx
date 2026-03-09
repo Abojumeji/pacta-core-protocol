@@ -1,0 +1,263 @@
+---
+title: Move Functions
+description: All public entry functions in the Pacta Move module
+---
+
+All functions below are in the `pacta::pacta` module. If you are calling them directly via PTB (not through the SDK), use the full target: `PACKAGE_ID::pacta::FUNCTION_NAME`.
+
+---
+
+## Agreement Creation
+
+### `create_and_share`
+
+Creates a new agreement and shares it as a Sui shared object. This is the standard way to create agreements.
+
+```
+entry fun create_and_share(
+    party_a:            address,
+    party_b:            address,
+    arbiter:            address,
+    release_conditions: u8,
+    terms_hash:         vector<u8>,
+    expiry_ms:          u64,
+    unlock_time_ms:     u64,
+    metadata:           vector<u8>,
+    clock:              &Clock,
+    ctx:                &mut TxContext,
+)
+```
+
+---
+
+## Party Management
+
+### `set_party_b`
+
+Update party B's address. Creator only. Cannot be called after party B deposits.
+
+```
+public fun set_party_b(
+    agreement: &mut Agreement,
+    new_party_b: address,
+    ctx: &mut TxContext,
+)
+```
+
+---
+
+## Deposits
+
+### `deposit_coin<T>`
+
+Deposit a coin into the agreement. Resolves the party (A or B) from the sender address automatically.
+
+```
+public fun deposit_coin<T>(
+    agreement: &mut Agreement,
+    payment:   Coin<T>,
+    clock:     &Clock,
+    ctx:       &mut TxContext,
+)
+```
+
+### `deposit_object<V: key + store>`
+
+Deposit a Move object into the agreement.
+
+```
+public fun deposit_object<V: key + store>(
+    agreement: &mut Agreement,
+    obj:       V,
+    clock:     &Clock,
+    ctx:       &mut TxContext,
+)
+```
+
+---
+
+## Approval and Settlement
+
+### `approve`
+
+Record the caller's approval to release funds. Both parties must approve (if conditions require it).
+
+```
+public fun approve(
+    agreement: &mut Agreement,
+    clock:     &Clock,
+    ctx:       &mut TxContext,
+)
+```
+
+### `settle_with_receipt`
+
+Trigger settlement. Returns a `SettlementReceipt` hot potato that must be consumed in the same PTB by calling `consume_settlement_receipt`. Any address can call this once conditions are met.
+
+```
+public fun settle_with_receipt(
+    agreement: &mut Agreement,
+    clock:     &Clock,
+    ctx:       &mut TxContext,
+): SettlementReceipt
+```
+
+### `consume_settlement_receipt`
+
+Consume the settlement receipt. Must be called in the same PTB as `settle_with_receipt`.
+
+```
+public fun consume_settlement_receipt(receipt: SettlementReceipt)
+```
+
+---
+
+## Cancellation
+
+### `cancel`
+
+Cancel the agreement. Creator can cancel in `Created` state. Either party can cancel in `Active` state if only one has deposited.
+
+```
+public fun cancel(
+    agreement: &mut Agreement,
+    ctx:       &mut TxContext,
+)
+```
+
+### `mutual_cancel`
+
+Signal consent to a mutual cancel. Both parties must call this. Agreement cancels when both consent.
+
+```
+public fun mutual_cancel(
+    agreement: &mut Agreement,
+    ctx:       &mut TxContext,
+)
+```
+
+### `cancel_expired`
+
+Cancel an expired agreement. Anyone can call this after `expiry_ms` has passed.
+
+```
+public fun cancel_expired(
+    agreement: &mut Agreement,
+    clock:     &Clock,
+    ctx:       &mut TxContext,
+)
+```
+
+---
+
+## Dispute
+
+### `raise_dispute`
+
+Raise a dispute on an active agreement. Either party can call this.
+
+```
+public fun raise_dispute(
+    agreement: &mut Agreement,
+    reason:    vector<u8>,
+    ctx:       &mut TxContext,
+)
+```
+
+### `resolve_dispute`
+
+Resolve a dispute. Arbiter only. `resolution`: 0 = favour party A, 1 = favour party B.
+
+```
+public fun resolve_dispute(
+    agreement:  &mut Agreement,
+    resolution: u8,
+    ctx:        &mut TxContext,
+)
+```
+
+### `resolve_dispute_split_coin<T>`
+
+Resolve dispute by splitting a coin balance between both parties at a specified basis points ratio. Arbiter only.
+
+```
+public fun resolve_dispute_split_coin<T>(
+    agreement: &mut Agreement,
+    a_bps:     u64,
+    ctx:       &mut TxContext,
+)
+```
+
+### `arbiter_settle`
+
+Settle an agreement directly as arbiter, bypassing normal conditions. Only callable by the arbiter when agreement is `Active`.
+
+```
+public fun arbiter_settle(
+    agreement: &mut Agreement,
+    clock:     &Clock,
+    ctx:       &mut TxContext,
+)
+```
+
+### `arbiter_cancel`
+
+Cancel an agreement as arbiter. Only callable when agreement is `Active`.
+
+```
+public fun arbiter_cancel(
+    agreement: &mut Agreement,
+    ctx:       &mut TxContext,
+)
+```
+
+---
+
+## Claiming
+
+### `claim_coin<T>`
+
+Claim an allocated coin from a finalized agreement.
+
+```
+public fun claim_coin<T>(
+    agreement: &mut Agreement,
+    ctx:       &mut TxContext,
+)
+```
+
+### `claim_object<V: key + store>`
+
+Claim an allocated object from a finalized agreement.
+
+```
+public fun claim_object<V: key + store>(
+    agreement: &mut Agreement,
+    index:     u64,
+    ctx:       &mut TxContext,
+)
+```
+
+---
+
+## Admin
+
+### `transfer_admin_cap`
+
+Transfer the `AdminCap` to a new address. Used to hand governance to a multisig wallet.
+
+```
+public entry fun transfer_admin_cap(cap: AdminCap, recipient: address)
+```
+
+### `record_outcome`
+
+Record a settlement outcome in the global `PactaRegistry`. Optional — do not call this in user-facing settlement flow. Call it in a background transaction after funds are already claimed.
+
+```
+public fun record_outcome(
+    _:         &AdminCap,
+    agreement: &Agreement,
+    registry:  &mut PactaRegistry,
+)
+```

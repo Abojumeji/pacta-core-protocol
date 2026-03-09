@@ -1,0 +1,177 @@
+---
+title: Build a Freelance App
+description: Step-by-step guide to building a freelance payment platform on Pacta
+---
+
+## Overview
+
+In this guide we build a simple freelance payment flow where:
+- A **client** locks payment in escrow
+- A **freelancer** delivers work
+- The client approves and funds are released
+- Either party can raise a dispute if something goes wrong
+
+Pacta handles all the escrow logic. You only write the UI and business logic.
+
+## The Flow
+
+```
+1. Client creates agreement (locks payment)
+2. Freelancer sees the job and accepts (deposits a nominal bond or just deposits 0)
+3. Freelancer delivers work off-chain
+4. Client reviews and approves
+5. Anyone triggers settlement — freelancer receives payment
+6. (If dispute) Platform arbiter reviews and decides
+```
+
+## Step 1 — Client Creates and Funds the Agreement
+
+When the client posts a job and hires the freelancer:
+
+```typescript
+import { PactaClient, ConditionPreset } from "@pacta/sdk"
+import crypto from "crypto"
+
+const pacta = new PactaClient({ network: "testnet" })
+
+// Hash the off-chain job description document
+const termsHash = "0x" + crypto
+  .createHash("sha3-256")
+  .update(JSON.stringify({
+    title:       "Build a landing page",
+    deliverable: "Figma file + deployed Next.js site",
+    deadline:    "2026-04-01",
+    payment:     "500 SUI",
+  }))
+  .digest("hex")
+
+// Create the agreement
+await pacta.createAgreement(clientSigner, {
+  partyA:            clientSigner.address,       // client
+  partyB:            freelancerAddress,           // freelancer
+  arbiter:           platformWalletAddress,       // your platform resolves disputes
+  releaseConditions: ConditionPreset.FullConsent, // both deposit + both approve
+  termsHash,
+  expiryMs:          BigInt(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+  unlockTimeMs:      0n,
+})
+
+// Client deposits payment into the agreement
+await pacta.depositCoin(clientSigner, {
+  agreementId:  agreementId,
+  coinObjectId: clientCoinObjectId,  // the SUI coin object to lock
+  coinType:     "0x2::sui::SUI",
+})
+```
+
+## Step 2 — Freelancer Accepts (Deposits Bond)
+
+The freelancer deposits a small bond to signal commitment. This is optional — you can design your app to not require it by setting `releaseConditions` to only require the client to deposit and approve.
+
+```typescript
+// Freelancer deposits their bond (e.g. 10 SUI)
+await pacta.depositCoin(freelancerSigner, {
+  agreementId:  agreementId,
+  coinObjectId: freelancerBondCoinId,
+  coinType:     "0x2::sui::SUI",
+})
+```
+
+## Step 3 — Client Approves After Delivery
+
+Once the freelancer delivers the work and the client is satisfied:
+
+```typescript
+await pacta.approve(clientSigner, { agreementId })
+await pacta.approve(freelancerSigner, { agreementId })
+```
+
+## Step 4 — Settlement
+
+Once both parties approve, your backend bot or the client's UI triggers settlement:
+
+```typescript
+// Anyone can call this — your platform bot, the client, or the freelancer
+await pacta.settle(anyWallet, { agreementId })
+```
+
+## Step 5 — Each Party Claims Funds
+
+```typescript
+// Freelancer claims the client's payment
+await pacta.claimCoin(freelancerSigner, {
+  agreementId,
+  coinType: "0x2::sui::SUI",
+})
+
+// Client claims back their bond (if freelancer deposited one)
+await pacta.claimCoin(clientSigner, {
+  agreementId,
+  coinType: "0x2::sui::SUI",
+})
+```
+
+## Handling a Dispute
+
+If the client is not satisfied with the deliverable:
+
+```typescript
+// Client raises a dispute
+await pacta.raiseDispute(clientSigner, {
+  agreementId,
+  reason: "The delivered site does not match the agreed specification",
+})
+```
+
+Your platform arbiter reviews the evidence off-chain and rules:
+
+```typescript
+// Platform rules in favour of the client (refund)
+await pacta.resolveDispute(platformSigner, {
+  agreementId,
+  resolution: 0, // 0 = favour party A (client), 1 = favour party B (freelancer)
+})
+```
+
+## Handling Cancellation
+
+If the freelancer goes silent and the job expires:
+
+```typescript
+// After expiry timestamp passes, anyone can cancel
+await pacta.cancelExpired(anyWallet, agreementId)
+```
+
+If both parties agree to cancel before expiry:
+
+```typescript
+await pacta.mutualCancel(clientSigner,     { agreementId })
+await pacta.mutualCancel(freelancerSigner, { agreementId })
+// Agreement cancels automatically when both consent
+```
+
+## Checking Agreement State in Your UI
+
+```typescript
+const agreement = await pacta.getAgreement(agreementId)
+
+// Show the right UI based on state
+if (!agreement.aDeposited) {
+  showUI("Waiting for client to fund escrow")
+} else if (!agreement.bDeposited) {
+  showUI("Waiting for freelancer to accept")
+} else if (!agreement.aApproved || !agreement.bApproved) {
+  showUI("Work in progress — awaiting approval")
+} else {
+  showUI("Ready to settle")
+}
+```
+
+## What Your Platform Does NOT Need to Build
+
+- Fund custody logic
+- Escrow smart contracts
+- Settlement mechanics
+- Dispute state machine
+
+Pacta handles all of that. You focus on the job posting UI, the deliverable review flow, and the arbiter dashboard.

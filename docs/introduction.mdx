@@ -1,0 +1,50 @@
+---
+title: Introduction
+description: The settlement primitive of Sui
+---
+
+## What is Pacta?
+
+Pacta is a trustless settlement protocol built on Sui. It is infrastructure — not an application.
+
+Think of it the way you think of Stripe. Stripe does not sell products. Stripe gives developers the tools to accept payments so they can build anything. Pacta does the same thing for peer-to-peer settlement on Sui. You bring the product. Pacta handles the escrow, conditions, and release of funds.
+
+Any application that involves two parties exchanging value — freelance work, OTC trades, NFT deals, lending, AI agent payments — can be built on top of Pacta in hours instead of months.
+
+## What Pacta Handles For You
+
+<CardGroup cols={2}>
+  <Card title="Trustless Escrow" icon="lock">
+    Funds are locked on-chain. No party can take them unilaterally. Conditions must be met before release.
+  </Card>
+  <Card title="Condition-Based Release" icon="sliders">
+    Set exactly what must happen before funds move — both parties deposit, both approve, a timelock expires, or any combination.
+  </Card>
+  <Card title="Dispute Resolution" icon="scale-balanced">
+    Every agreement can have an optional arbiter. If parties disagree, the arbiter rules. No trusted intermediary needed at the protocol level.
+  </Card>
+  <Card title="Permissionless Settlement" icon="bolt">
+    Once all conditions are met, anyone can trigger settlement — including bots and AI agents. No party holds the key.
+  </Card>
+</CardGroup>
+
+## What You Build
+
+| App Type | What Pacta Provides |
+|---|---|
+| Freelance platform | Escrow between client and freelancer, release on approval |
+| OTC trading desk | Two-party token swap with mutual deposit and approval |
+| NFT marketplace | Atomic delivery-vs-payment for NFT trades |
+| Lending protocol | Collateral locking with condition-based release |
+| AI agent payments | Permissionless settlement triggered by agent bots |
+| DAO service agreements | Multi-condition escrow with arbiter |
+
+## What Pacta Does Not Do
+
+Pacta does not store files, encrypt data, or make off-chain decisions. It is a pure on-chain settlement primitive. What your app does around it — the UI, the file storage, the business logic — is entirely your choice.
+
+## Next Step
+
+<Card title="Getting Started" icon="rocket" href="/getting-started">
+  Install the SDK and create your first agreement in under 5 minutes
+</Card>

@@ -1,0 +1,133 @@
+---
+title: Build an OTC Desk
+description: Step-by-step guide to building a two-party OTC trading desk on Pacta
+---
+
+## Overview
+
+An OTC (over-the-counter) desk lets two parties swap tokens directly — no order book, no AMM, just a direct deal. Pacta is a natural fit because:
+
+- Both parties lock their tokens before the swap
+- Settlement is atomic — both sides receive their tokens in the same transaction
+- No trusted intermediary holds funds
+
+## Example Deal
+
+Alice wants to sell 10,000 SUI for 5,000 USDC. Bob wants to buy. They agree off-platform, then execute on Pacta.
+
+## Step 1 — Alice Creates the Agreement
+
+```typescript
+import { PactaClient, ConditionPreset } from "@pacta/sdk"
+
+const pacta = new PactaClient({ network: "testnet" })
+
+// Alice creates the deal
+await pacta.createAgreement(aliceSigner, {
+  partyA:            aliceSigner.address,   // Alice — selling SUI
+  partyB:            bobAddress,             // Bob — selling USDC
+  arbiter:           "0x0",                  // No arbiter for simple swaps
+  releaseConditions: ConditionPreset.DepositOnly, // Both deposit = swap executes
+  termsHash:         "0xDEAL_HASH...",       // Hash of the agreed swap terms
+  expiryMs:          BigInt(Date.now() + 2 * 60 * 60 * 1000), // 2 hour window
+  unlockTimeMs:      0n,
+})
+```
+
+<Note>
+Using `DepositOnly` means as soon as both parties deposit, anyone can trigger settlement with no approval step needed. This is the fastest path for OTC swaps.
+</Note>
+
+## Step 2 — Alice Deposits SUI
+
+```typescript
+await pacta.depositCoin(aliceSigner, {
+  agreementId:  agreementId,
+  coinObjectId: aliceSuiCoinId,
+  coinType:     "0x2::sui::SUI",
+})
+```
+
+## Step 3 — Bob Deposits USDC
+
+```typescript
+await pacta.depositCoin(bobSigner, {
+  agreementId:  agreementId,
+  coinObjectId: bobUsdcCoinId,
+  coinType:     "0xUSDC_PACKAGE::usdc::USDC",
+})
+```
+
+## Step 4 — Anyone Triggers Settlement
+
+The moment both have deposited, all conditions are met. Your platform backend settles automatically:
+
+```typescript
+await pacta.settle(platformBotWallet, { agreementId })
+```
+
+## Step 5 — Each Party Claims
+
+```typescript
+// Bob claims Alice's SUI
+await pacta.claimCoin(bobSigner, {
+  agreementId,
+  coinType: "0x2::sui::SUI",
+})
+
+// Alice claims Bob's USDC
+await pacta.claimCoin(aliceSigner, {
+  agreementId,
+  coinType: "0xUSDC_PACKAGE::usdc::USDC",
+})
+```
+
+## Adding an Approval Step for Large Deals
+
+For large institutional deals, you may want both parties to explicitly confirm before settlement. Use `FullConsent` instead:
+
+```typescript
+releaseConditions: ConditionPreset.FullConsent // both deposit + both approve
+```
+
+Then both parties call `approve()` after depositing to confirm the deal terms before funds move.
+
+## Handling a Failed Deal
+
+If Bob never deposits within the 2-hour window, Alice can cancel after expiry:
+
+```typescript
+await pacta.cancelExpired(aliceSigner, agreementId)
+
+// Alice then claims back her SUI
+await pacta.claimCoin(aliceSigner, {
+  agreementId,
+  coinType: "0x2::sui::SUI",
+})
+```
+
+## Monitoring Deal Status in Your UI
+
+```typescript
+const agreement = await pacta.getAgreement(agreementId)
+
+const timeLeft = Number(agreement.expiryMs) - Date.now()
+
+if (!agreement.aDeposited) {
+  showStatus("Waiting for Alice to deposit SUI")
+} else if (!agreement.bDeposited) {
+  showStatus(`Waiting for Bob to deposit USDC — ${Math.floor(timeLeft / 60000)} minutes left`)
+} else {
+  showStatus("Both deposited — settling...")
+  await pacta.settle(botWallet, { agreementId })
+}
+```
+
+## What Your OTC Desk Does NOT Need to Build
+
+- Custody of either party's tokens
+- An escrow smart contract
+- Settlement or swap logic
+- Expiry enforcement
+
+All of that is Pacta. You build the deal matching UI, the price negotiation flow, and the user dashboard.

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- SE segment: lighter navy for dark background -->
+  <path d="M 89.61 55.57 A 40 40 0 0 1 55.57 89.61 L 53.62 75.75 A 26 26 0 0 0 75.75 53.62 Z" fill="#2A5080"/>
+  <!-- SW segment: lighter gray for dark background -->
+  <path d="M 89.61 55.57 A 40 40 0 0 1 55.57 89.61 L 53.62 75.75 A 26 26 0 0 0 75.75 53.62 Z" fill="#6B7F8E" transform="rotate(90 50 50)"/>
+  <!-- NW segment: lighter navy -->
+  <path d="M 89.61 55.57 A 40 40 0 0 1 55.57 89.61 L 53.62 75.75 A 26 26 0 0 0 75.75 53.62 Z" fill="#2A5080" transform="rotate(180 50 50)"/>
+  <!-- NE segment: lighter gray -->
+  <path d="M 89.61 55.57 A 40 40 0 0 1 55.57 89.61 L 53.62 75.75 A 26 26 0 0 0 75.75 53.62 Z" fill="#6B7F8E" transform="rotate(270 50 50)"/>
+  <!-- Center square: sage green -->
+  <rect x="45" y="45" width="10" height="10" fill="#8ABD88"/>
+</svg>

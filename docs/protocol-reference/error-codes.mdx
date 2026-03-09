@@ -1,0 +1,56 @@
+---
+title: Error Codes
+description: All error codes thrown by the Pacta protocol and what they mean
+---
+
+When a transaction fails, Sui returns an abort code. Use this table to understand what went wrong and how to handle it in your app.
+
+| Code | Name | What caused it | How to fix it |
+|---|---|---|---|
+| `0` | `ENotParty` | Caller is not party A or party B | Check that the signing wallet is one of the two parties |
+| `1` | `EInvalidState` | Function called in wrong agreement state | Check `agreement.state` before calling — e.g. cannot approve a Cancelled agreement |
+| `2` | `ENotArbiter` | Caller is not the arbiter | Only the arbiter address can call dispute resolution functions |
+| `3` | `EExpired` | Agreement has passed its expiry time | The expiry timestamp has passed — cancel instead |
+| `4` | `ENotExpired` | Called `cancel_expired` before expiry | The agreement has not expired yet — wait or use mutual cancel |
+| `5` | `EUnlockTimeNotReached` | Called `settle` before unlock time | The timelock has not expired — wait until `unlockTimeMs` |
+| `6` | `EZeroDeposit` | Tried to deposit a zero-value coin | Ensure the coin has a non-zero balance before depositing |
+| `7` | `EConditionsNotMet` | Called `settle` before all conditions are satisfied | Check all conditions — both deposited, both approved, timelock passed |
+| `8` | `ENotRecipient` | Caller tried to claim funds not allocated to them | Only the designated recipient can claim a specific allocation |
+| `9` | `EDepositNotFound` | Tried to claim a coin type that was never deposited | The coin type requested does not exist in this agreement's escrow |
+| `10` | `EInvalidResolution` | Arbiter passed an invalid resolution value | Resolution must be `0` (favour A) or `1` (favour B) |
+| `11` | `ENotCreator` | Caller is not the agreement creator | Only the creator can cancel in `Created` state or update party B |
+| `12` | `ENoArbiter` | Tried to raise a dispute but no arbiter is set | Agreement was created with `arbiter = 0x0` — disputes not supported |
+| `13` | `ECannotCancelBothDeposited` | Tried to cancel after both parties deposited | Use mutual cancel instead when both have deposited |
+| `14` | `EHasUnclaimedAssets` | Tried to close agreement with assets still in escrow | All coins and objects must be claimed before the agreement can be destroyed |
+| `15` | `EInvalidBps` | Basis points value exceeds 10,000 | Split percentages must add up to 10,000 bps (100%) |
+| `16` | `ENotAuthorized` | Caller lacks the required capability | Only addresses holding AdminCap can call admin functions |
+| `17` | `EAlreadyHookAttached` | Tried to attach a hook when one already exists | Detach the existing hook before attaching a new one |
+| `18` | `ENoHookAttached` | Tried to detach a hook that does not exist | No hook is currently attached to this agreement |
+| `19` | `EPartyBAlreadyDeposited` | Tried to update party B after they deposited | Party B address is locked once they deposit |
+| `20` | `EAlreadyRecorded` | Tried to record outcome twice in the registry | `record_outcome` can only be called once per agreement |
+| `21` | `EInvalidAgreement` | Settlement receipt does not match the agreement | The receipt was produced by a different agreement — check your PTB |
+
+---
+
+## Handling Errors in Your App
+
+```typescript
+try {
+  await pacta.settle(signer, { agreementId })
+} catch (error) {
+  const message = error?.message ?? ""
+
+  if (message.includes("MoveAbort") && message.includes(", 7)")) {
+    showError("Conditions not yet met — check that both parties have deposited and approved")
+  } else if (message.includes("MoveAbort") && message.includes(", 5)")) {
+    showError("Settlement is timelocked — funds cannot move yet")
+  } else {
+    showError("Transaction failed — please try again")
+    console.error(error)
+  }
+}
+```
+
+<Note>
+Sui encodes abort codes in the error message as `MoveAbort(..., CODE)`. Parse the code from the message to show users a friendly error.
+</Note>

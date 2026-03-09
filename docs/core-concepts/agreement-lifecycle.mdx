@@ -1,0 +1,104 @@
+---
+title: Agreement Lifecycle
+description: How an agreement moves through its states from creation to settlement
+---
+
+## States
+
+Every Pacta agreement is always in one of six states:
+
+```
+Created → Active → Settled
+                ↘ Cancelled
+                ↘ Disputed → Dispute Resolved
+```
+
+| State | Value | Meaning |
+|---|---|---|
+| `Created` | 0 | Agreement exists on-chain. Waiting for deposits. |
+| `Active` | 1 | Both parties have deposited. Waiting for conditions to be met. |
+| `Settled` | 2 | All conditions met. Funds released to recipients. |
+| `Cancelled` | 3 | Agreement was cancelled before settlement. |
+| `Disputed` | 4 | A party raised a dispute. Waiting for arbiter to rule. |
+| `DisputeResolved` | 5 | Arbiter has ruled. Funds distributed per resolution. |
+
+## State Transitions
+
+### Created → Active
+
+Happens automatically when both parties deposit their funds. The agreement moves to `Active` the moment the second deposit lands.
+
+### Active → Settled
+
+Happens when:
+1. All release conditions in the bitmask are satisfied
+2. Any address calls `settle()`
+
+Settlement is permissionless — bots, keepers, or AI agents can trigger it.
+
+### Active → Cancelled
+
+- The creator can cancel before party B deposits
+- Either party can cancel if only one has deposited
+- Both parties can agree to cancel via `mutualCancel()`
+- Anyone can cancel an expired agreement via `cancelExpired()`
+
+### Active → Disputed
+
+Either party can raise a dispute at any time while the agreement is `Active`. Once raised, only the arbiter can move the agreement forward.
+
+### Disputed → Dispute Resolved
+
+The arbiter calls `resolveDispute()` and specifies who wins. Funds are distributed accordingly.
+
+## In Code
+
+```typescript
+import { PactaClient, AgreementState } from "@pacta/sdk"
+
+const pacta   = new PactaClient({ network: "testnet" })
+const agreement = await pacta.getAgreement("0xAGREEMENT_ID...")
+
+switch (agreement.state) {
+  case AgreementState.Created:
+    console.log("Waiting for deposits")
+    break
+  case AgreementState.Active:
+    console.log("Active — checking conditions")
+    break
+  case AgreementState.Settled:
+    console.log("Settled — funds released")
+    break
+  case AgreementState.Cancelled:
+    console.log("Cancelled")
+    break
+  case AgreementState.Disputed:
+    console.log("Disputed — waiting for arbiter")
+    break
+  case AgreementState.DisputeResolved:
+    console.log("Dispute resolved")
+    break
+}
+```
+
+## Checking Deposit and Approval Status
+
+```typescript
+const agreement = await pacta.getAgreement("0xAGREEMENT_ID...")
+
+console.log("Party A deposited:", agreement.aDeposited)
+console.log("Party B deposited:", agreement.bDeposited)
+console.log("Party A approved:",  agreement.aApproved)
+console.log("Party B approved:",  agreement.bApproved)
+```
+
+## Claiming Funds After Settlement
+
+Settlement does not automatically send funds to each party's wallet. Each party must call `claimCoin()` to pull their allocation. This is by design — it keeps settlement atomic and gas efficient.
+
+```typescript
+await pacta.claimCoin(signer, {
+  agreementId: "0xAGREEMENT_ID...",
+  coinType:    "0x2::sui::SUI",
+})
+```

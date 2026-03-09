@@ -1,0 +1,183 @@
+---
+title: Types and Constants
+description: All TypeScript types, interfaces, and constants exported by the SDK
+---
+
+## AgreementState
+
+Numeric constants for each agreement state.
+
+```typescript
+import { AgreementState } from "@pacta/sdk"
+
+AgreementState.Created          // 0
+AgreementState.Active           // 1
+AgreementState.Settled          // 2
+AgreementState.Cancelled        // 3
+AgreementState.Disputed         // 4
+AgreementState.DisputeResolved  // 5
+```
+
+---
+
+## Condition
+
+Bitmask flags for release conditions. Combine with bitwise OR.
+
+```typescript
+import { Condition } from "@pacta/sdk"
+
+Condition.ADeposited  // 0x01
+Condition.BDeposited  // 0x02
+Condition.AApproved   // 0x04
+Condition.BApproved   // 0x08
+Condition.Timelock    // 0x10
+```
+
+---
+
+## ConditionPreset
+
+Pre-built combinations of the most common condition sets.
+
+```typescript
+import { ConditionPreset } from "@pacta/sdk"
+
+ConditionPreset.FullConsent     // ADeposited | BDeposited | AApproved | BApproved = 15
+ConditionPreset.DepositOnly     // ADeposited | BDeposited = 3
+ConditionPreset.TimelockEscrow  // ADeposited | BDeposited | Timelock = 19
+```
+
+---
+
+## Party
+
+```typescript
+import { Party } from "@pacta/sdk"
+
+Party.A  // 0
+Party.B  // 1
+```
+
+---
+
+## Agreement
+
+The on-chain agreement object, returned by `getAgreement()`.
+
+```typescript
+interface Agreement {
+  id:                string         // Sui object ID
+  version:           number         // Protocol version
+  creator:           string         // Address that created the agreement
+  partyA:            string         // Party A address
+  partyB:            string         // Party B address
+  arbiter:           string         // Arbiter address (0x0 if none)
+  state:             AgreementState // Current state
+  releaseConditions: number         // Condition bitmask
+  aDeposited:        boolean        // Has party A deposited?
+  bDeposited:        boolean        // Has party B deposited?
+  aApproved:         boolean        // Has party A approved?
+  bApproved:         boolean        // Has party B approved?
+  aCancelConsent:    boolean        // Has party A consented to mutual cancel?
+  bCancelConsent:    boolean        // Has party B consented to mutual cancel?
+  aObjCount:         number         // Number of objects deposited by party A
+  bObjCount:         number         // Number of objects deposited by party B
+  activeSlots:       number         // Total unclaimed asset slots
+  hookAttached:      boolean        // Is a protocol hook attached?
+  registryRecorded:  boolean        // Has outcome been recorded in registry?
+  aRecipient:        string         // Where party A's funds go on settlement
+  bRecipient:        string         // Where party B's funds go on settlement
+  termsHash:         string         // Hex-encoded hash of off-chain terms
+  expiryMs:          bigint         // Expiry timestamp in Unix ms (0 = none)
+  unlockTimeMs:      bigint         // Unlock timestamp in Unix ms (0 = none)
+  createdAtMs:       bigint         // Creation timestamp in Unix ms
+  settledAtMs:       bigint         // Settlement timestamp (0 if not settled)
+  metadata:          string         // App-specific metadata as hex string
+}
+```
+
+---
+
+## PactaRegistry
+
+Global protocol statistics, returned by `getRegistry()`.
+
+```typescript
+interface PactaRegistry {
+  id:               string  // Sui object ID of the registry
+  version:          number  // Protocol version
+  totalAgreements:  bigint  // Total agreements ever created
+  totalSettled:     bigint  // Total agreements settled
+  totalCancelled:   bigint  // Total agreements cancelled
+  totalDisputed:    bigint  // Total agreements disputed
+}
+```
+
+---
+
+## NetworkConfig
+
+```typescript
+interface NetworkConfig {
+  packageId:  string  // Deployed Pacta package ID
+  registryId: string  // PactaRegistry shared object ID
+  rpcUrl:     string  // Sui RPC endpoint URL
+}
+```
+
+---
+
+## Input Types
+
+### CreateAgreementParams
+
+```typescript
+interface CreateAgreementParams {
+  partyA:            string
+  partyB:            string
+  arbiter:           string
+  releaseConditions: number
+  termsHash:         string
+  expiryMs:          bigint
+  unlockTimeMs:      bigint
+  metadata?:         string  // optional
+}
+```
+
+### DepositCoinParams
+
+```typescript
+interface DepositCoinParams {
+  agreementId:  string
+  coinObjectId: string
+  coinType:     string
+}
+```
+
+### RaiseDisputeParams
+
+```typescript
+interface RaiseDisputeParams {
+  agreementId: string
+  reason:      string  // UTF-8 string, stored on-chain
+}
+```
+
+### ResolveDisputeParams
+
+```typescript
+interface ResolveDisputeParams {
+  agreementId: string
+  resolution:  0 | 1  // 0 = favour party A, 1 = favour party B
+}
+```
+
+### ClaimCoinParams
+
+```typescript
+interface ClaimCoinParams {
+  agreementId: string
+  coinType:    string
+}
+```

@@ -1,0 +1,154 @@
+---
+title: Getting Started
+description: Install the SDK and create your first agreement
+---
+
+## Prerequisites
+
+- Node.js 18 or higher
+- A Sui wallet (for signing transactions)
+- Basic knowledge of TypeScript
+
+## Install the SDK
+
+```bash
+npm install @pacta/sdk
+```
+
+## Connect to Testnet
+
+```typescript
+import { PactaClient } from "@pacta/sdk"
+
+const pacta = new PactaClient({ network: "testnet" })
+```
+
+That is all the setup you need. The client connects to Sui testnet automatically.
+
+## Create Your First Agreement
+
+This example creates a two-party escrow where both parties must deposit and both must approve before funds are released.
+
+```typescript
+import { PactaClient, ConditionPreset } from "@pacta/sdk"
+import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519"
+import { SuiClient } from "@mysten/sui/client"
+
+const pacta = new PactaClient({ network: "testnet" })
+
+// Your signer — replace with your wallet integration
+const keypair = Ed25519Keypair.generate()
+
+const signer = {
+  address: keypair.getPublicKey().toSuiAddress(),
+  signAndExecuteTransaction: async (tx) => {
+    const suiClient = new SuiClient({ url: "https://fullnode.testnet.sui.io:443" })
+    return suiClient.signAndExecuteTransaction({
+      transaction: tx,
+      signer:      keypair,
+    })
+  },
+}
+
+// Create an agreement
+const result = await pacta.createAgreement(signer, {
+  partyA:            signer.address,          // you
+  partyB:            "0xBOB_ADDRESS...",      // counterparty
+  arbiter:           "0xARBITER_ADDRESS...",  // dispute resolver (can be 0x0 if none)
+  releaseConditions: ConditionPreset.FullConsent, // both deposit + both approve
+  termsHash:         "0xYOUR_TERMS_HASH...", // SHA3-256 of your off-chain agreement
+  expiryMs:          0n,                      // 0 = no expiry
+  unlockTimeMs:      0n,                      // 0 = no timelock
+})
+
+console.log("Agreement created. Transaction:", result.digest)
+```
+
+## Full Flow — Step by Step
+
+After creating the agreement, the full lifecycle looks like this:
+
+### Step 1 — Party A deposits
+
+```typescript
+await pacta.depositCoin(signerA, {
+  agreementId:  "0xAGREEMENT_ID...",
+  coinObjectId: "0xCOIN_OBJECT_ID...",
+  coinType:     "0x2::sui::SUI",
+})
+```
+
+### Step 2 — Party B deposits
+
+```typescript
+await pacta.depositCoin(signerB, {
+  agreementId:  "0xAGREEMENT_ID...",
+  coinObjectId: "0xCOIN_OBJECT_ID...",
+  coinType:     "0x2::sui::SUI",
+})
+```
+
+### Step 3 — Both parties approve
+
+```typescript
+// Party A approves
+await pacta.approve(signerA, { agreementId: "0xAGREEMENT_ID..." })
+
+// Party B approves
+await pacta.approve(signerB, { agreementId: "0xAGREEMENT_ID..." })
+```
+
+### Step 4 — Anyone settles
+
+Once all conditions are met, any address (including a bot) can trigger settlement.
+
+```typescript
+await pacta.settle(anyWallet, { agreementId: "0xAGREEMENT_ID..." })
+```
+
+### Step 5 — Each party claims their funds
+
+```typescript
+// Party A claims
+await pacta.claimCoin(signerA, {
+  agreementId: "0xAGREEMENT_ID...",
+  coinType:    "0x2::sui::SUI",
+})
+
+// Party B claims
+await pacta.claimCoin(signerB, {
+  agreementId: "0xAGREEMENT_ID...",
+  coinType:    "0x2::sui::SUI",
+})
+```
+
+## Read the Agreement State
+
+At any point you can fetch the current state of an agreement:
+
+```typescript
+const agreement = await pacta.getAgreement("0xAGREEMENT_ID...")
+
+console.log(agreement.state)       // 0=Created, 1=Active, 2=Settled...
+console.log(agreement.aDeposited)  // true/false
+console.log(agreement.bDeposited)  // true/false
+console.log(agreement.aApproved)   // true/false
+console.log(agreement.bApproved)   // true/false
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Core Concepts" icon="book" href="/core-concepts/agreement-lifecycle">
+    Understand how agreements work under the hood
+  </Card>
+  <Card title="SDK Reference" icon="code" href="/sdk-reference/client">
+    Full reference for every method and parameter
+  </Card>
+  <Card title="Freelance App Guide" icon="briefcase" href="/guides/freelance-app">
+    Build a complete freelance payment app on Pacta
+  </Card>
+  <Card title="OTC Desk Guide" icon="arrows-left-right" href="/guides/otc-desk">
+    Build a two-party OTC trading desk on Pacta
+  </Card>
+</CardGroup>

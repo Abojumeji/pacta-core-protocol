@@ -1,0 +1,94 @@
+---
+title: Parties and Arbiter
+description: The three roles in a Pacta agreement
+---
+
+## The Three Roles
+
+Every Pacta agreement has three address slots:
+
+| Role | Who they are | What they can do |
+|---|---|---|
+| **Party A** | First party — usually the initiator | Deposit, approve, cancel, raise dispute |
+| **Party B** | Second party — counterparty | Deposit, approve, cancel, raise dispute |
+| **Arbiter** | Neutral third party | Resolve disputes, split funds, assign assets |
+
+## Party A
+
+Party A is always the address that creates the agreement. They are the initiator.
+
+When you call `createAgreement()`, the `partyA` field should be your own address. Party A can:
+- Deposit funds into the agreement
+- Call `approve()` to signal they are satisfied
+- Cancel the agreement before party B deposits
+- Raise a dispute if party B fails to deliver
+- Signal consent to a mutual cancel
+
+## Party B
+
+Party B is the counterparty. They can be set at creation time or updated later (before they deposit) using `setPartyB()`.
+
+Allowing `setPartyB()` before deposit is useful when the counterparty is not known at creation time — for example, a marketplace listing where any buyer can fill the order.
+
+Party B can do everything Party A can do, except cancel in the `Created` state (only the creator can cancel before both parties are active).
+
+## Arbiter
+
+The arbiter is optional. If you pass `0x0` as the arbiter address, no arbiter is assigned and disputes cannot be raised.
+
+The arbiter cannot:
+- Deposit or approve on behalf of a party
+- Trigger settlement
+- Cancel the agreement unilaterally
+
+The arbiter can only act when a dispute has been raised. Once in `Disputed` state, the arbiter can:
+- Rule in favour of party A or party B
+- Split a coin balance between both parties
+- Assign an object to a specific party
+- Conclude the dispute (no winner, parties claim what they deposited)
+
+## Who Should Be the Arbiter?
+
+This is an application-level decision. Common choices:
+
+| Use case | Arbiter choice |
+|---|---|
+| Freelance platform | The platform itself (your app's wallet) |
+| OTC desk | A trusted neutral third party |
+| DAO service agreement | A DAO multisig |
+| Automated deal | `0x0` — no arbiter, disputes not allowed |
+
+## Recipient Addresses
+
+By default, funds go back to the depositing party on settlement. Party A's funds go to party A. Party B's funds go to party B.
+
+Your app can override this at the protocol level by calling `extract_coin_balance()` with custom recipient logic — but this is an advanced composability pattern for protocols building on top of Pacta.
+
+## In Code
+
+```typescript
+await pacta.createAgreement(signer, {
+  partyA:  signer.address,        // you
+  partyB:  "0xCOUNTERPARTY...",  // the other side
+  arbiter: "0xARBITER...",        // dispute resolver, or "0x0" for none
+
+  releaseConditions: ConditionPreset.FullConsent,
+  termsHash:         "0xHASH...",
+  expiryMs:          0n,
+  unlockTimeMs:      0n,
+})
+```
+
+## Updating Party B Before Deposit
+
+```typescript
+// Change party B before they have deposited
+await pacta.setPartyB(signer, {
+  agreementId: "0xAGREEMENT_ID...",
+  newPartyB:   "0xNEW_PARTY_B...",
+})
+```
+
+<Warning>
+Once party B deposits, their address is locked. You cannot change party B after a deposit.
+</Warning>

@@ -1,0 +1,9 @@
+[package]
+name = "pacta"
+edition = "2024.beta"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "664b05b3b047c5bb03979d093660176176ea6175" }
+
+[addresses]
+pacta = "0x0"
