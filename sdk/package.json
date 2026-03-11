@@ -1,5 +1,5 @@
 {
-  "name": "@pacta/sdk",
+  "name": "@pactalab/sdk",
   "version": "0.1.0",
   "description": "TypeScript SDK for the Pacta settlement protocol on Sui",
   "main": "dist/index.js",
